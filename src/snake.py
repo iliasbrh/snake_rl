@@ -27,17 +27,20 @@ class Snake:
         
     def update(self):
         new_pos = (self.positions[-1][0] + self.size*self.speedx, self.positions[-1][1] + self.size*self.speedy)
+        
+        if new_pos in self.positions[:-1] or new_pos[0] >= self.width or new_pos[0] < 0 or new_pos[1] >= self.height or new_pos[1] < 0:
+            return 1 # end of the game
+        
         self.positions.append(new_pos)
         self.apple.allowed_pos.remove(new_pos)
         
-        if self.positions[-1] != self.apple.position:
-            tail = self.positions.pop(0)
-            self.apple.allowed_pos.add(tail)
-        else:
+        if new_pos == self.apple.position:
             self.apple.move()
             return 2 # to detect apple reward
-        if new_pos in self.positions[:-1] or new_pos[0] >= self.width or new_pos[0] < 0 or new_pos[1] >= self.height or new_pos[1] < 0:
-            return 1 # end of the game
+        else:
+            tail = self.positions.pop(0)
+            self.apple.allowed_pos.add(tail)
+            return 0
             
     def direction(self, key):
         if key == pygame.K_UP:

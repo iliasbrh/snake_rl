@@ -45,8 +45,10 @@ actions_lookuptable = [pygame.K_UP, pygame.K_DOWN, pygame.K_RIGHT, pygame.K_LEFT
 directions = [(0, -1), (0, 1), (1, 0), (-1, 0)]
 
 class Environment:
-    def __init__(self):
+    def __init__(self, width, height):
         self.snake_game = None
+        self.width = width
+        self.height = height
     
     def get_observation(self):
         outcome = self.snake_game.update()
@@ -65,14 +67,14 @@ class Environment:
             reward = -0.05
         
         state = torch.zeros((10), dtype=torch.float32, device=device)
-        state[0] = (self.snake_game.apple.position[0] - self.snake_game.positions[-1][0])/width
-        state[1] = (self.snake_game.apple.position[1] - self.snake_game.positions[-1][1])/width
+        state[0] = (self.snake_game.apple.position[0] - self.snake_game.positions[-1][0])/self.width
+        state[1] = (self.snake_game.apple.position[1] - self.snake_game.positions[-1][1])/self.height
         
         for i, (dx, dy) in enumerate(directions):
             next_x = self.snake_game.positions[-1][0] + dx * snake_size
             next_y = self.snake_game.positions[-1][1] + dy * snake_size
             
-            wall = next_x >= width or next_x < 0 or next_y >= height or next_y < 0
+            wall = next_x >= self.width or next_x < 0 or next_y >= self.height or next_y < 0
             body = (next_x, next_y) in set(self.snake_game.positions[:-1])
             state[i+2] = float(wall or body)
             
@@ -94,7 +96,7 @@ class Environment:
         return self.get_observation()
         
     def reset(self):
-        self.snake_game = Snake(20, width, height)
+        self.snake_game = Snake(20, self.width, self.height)
         return self.get_observation()
         
 ##############

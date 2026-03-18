@@ -3,7 +3,7 @@ import torch
 import model
 pygame.init()
 
-size = width, height = 600, 600
+size = width, height = 200, 200
 win = pygame.display.set_mode(size)
 pygame.display.set_caption("Snake")
 clock = pygame.time.Clock()
@@ -36,7 +36,7 @@ while running:
         if event.type == pygame.QUIT:
             running = False        
 
-    clock.tick(120)
+    clock.tick(15)
 
 
 pygame.quit() 
