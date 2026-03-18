@@ -9,15 +9,14 @@ pygame.display.set_caption("Snake")
 clock = pygame.time.Clock()
 
 env = model.Environment(width, height)
-model = model.DQN()
-model.load_state_dict(torch.load("models/model2.pth", map_location=torch.device("cpu"), weights_only=False))
-model = model.to("cpu")
+policy = model.DQN()
+policy.load_state_dict(torch.load("models/model2.pth", map_location=torch.device("cpu"), weights_only=False))
 
 s, _, terminated, _ = env.reset()
 
 def select_action_determinist(state):
     with torch.no_grad():
-        return torch.argmax(model(state)).item()
+        return torch.argmax(policy(state)).item()
 
 running = True
 while running:
