@@ -7,7 +7,6 @@ from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR
 import random
 from collections import deque
 
-window_size = width, height = 200, 200
 snake_size = 20
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -206,12 +205,14 @@ LR = 1e-4
 
 
 if __name__ == "__main__":
+    window_size = width, height = 200, 200
+    
     num_episode = 50000
     warmup_episode = 7000
 
     memory = ReplayMemory(100000)
     step = 0
-    env = Environment()
+    env = Environment(width, height)
 
     policy_net = DQN().to(device)
     target_net = DQN().to(device)
