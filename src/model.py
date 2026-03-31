@@ -3,13 +3,13 @@ import numpy as np
 from statistics import mean
 from snake import Snake
 import torch
-from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR
 import random
 from collections import deque
 
 snake_size = 20
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = "cpu"
 print(device, flush=True)
 
 
@@ -27,9 +27,9 @@ class ReplayMemory():
     def sample(self, batch_size):
         batch = random.sample(self.memory, batch_size)
         return {
-            "state": torch.stack([transition[0] for transition in batch]),
+            "state": (torch.cat([transition[0][0] for transition in batch], dim=0), torch.cat([transition[0][1] for transition in batch], dim=0)), # for the state_map and state_direction
             "action": torch.tensor([transition[1] for transition in batch], dtype=torch.int64, device=device).unsqueeze(1),
-            "next_state": torch.stack([transition[2] for transition in batch]),
+            "next_state": (torch.cat([transition[2][0] for transition in batch], dim=0), torch.cat([transition[2][1] for transition in batch], dim=0)),
             "reward": torch.tensor([transition[3] for transition in batch], dtype=torch.float32, device=device).unsqueeze(1),
             "done": torch.tensor([transition[4] for transition in batch], dtype=torch.float32, device=device).unsqueeze(1)
         }
@@ -58,35 +58,24 @@ class Environment:
         # otherwise -> nothing special, and a negative reward to make sure the snake does not just 
         # wander around
         if outcome == 1:
-            reward = -40
+            reward = -10
             terminated = True
         elif outcome == 2:
-            reward = 40
+            reward = 10
         else:
-            reward = -0.05
+            reward = -0.01
         
-        state = torch.zeros((10), dtype=torch.float32, device=device)
-        state[0] = (self.snake_game.apple.position[0] - self.snake_game.positions[-1][0])/self.width
-        state[1] = (self.snake_game.apple.position[1] - self.snake_game.positions[-1][1])/self.height
-        
-        for i, (dx, dy) in enumerate(directions):
-            next_x = self.snake_game.positions[-1][0] + dx * snake_size
-            next_y = self.snake_game.positions[-1][1] + dy * snake_size
-            
-            wall = next_x >= self.width or next_x < 0 or next_y >= self.height or next_y < 0
-            body = (next_x, next_y) in set(self.snake_game.positions[:-1])
-            state[i+2] = float(wall or body)
-            
-            state[i+6] = int((dx, dy) == (self.snake_game.speedx, self.snake_game.speedy))
-        
-        """
-        state = torch.zeros((n_observations, width//snake_size, height//snake_size), dtype=torch.float32, device=device)
-        state[0, (self.snake_game.apple.position[1]//snake_size)%10, (self.snake_game.apple.position[0]//snake_size)%10] = 1.
-        state[1, (self.snake_game.positions[-1][1]//snake_size)%10, (self.snake_game.positions[-1][0]//snake_size)%10] = 1.
+        state_map = torch.zeros((1, n_observations, width//snake_size, height//snake_size), dtype=torch.float32, device=device)
+        state_map[0, 0, (self.snake_game.apple.position[1]//snake_size)%10, (self.snake_game.apple.position[0]//snake_size)%10] = 1.
+        state_map[0, 1, (self.snake_game.positions[-1][1]//snake_size)%10, (self.snake_game.positions[-1][0]//snake_size)%10] = 1.
         for pos in self.snake_game.positions[:-1]:
-            state[2, pos[1]//snake_size, pos[0]//snake_size] = 1.
-        """
-        return state, reward, terminated, len(self.snake_game.positions)
+            state_map[0, 2, pos[1]//snake_size, pos[0]//snake_size] = 1.
+
+        state_direction = torch.zeros((1, 4), dtype=torch.float32, device=device)
+        for i, (dx, dy) in enumerate(directions):
+            state_direction[0, i] = int((dx, dy) == (self.snake_game.speedx, self.snake_game.speedy))
+
+        return (state_map, state_direction), reward, terminated, len(self.snake_game.positions)
     
     def step(self, action):
         # action is in the format [0, 1, 2, 3] that we must convert to UP DOWN RIGHT LEFT
@@ -109,17 +98,17 @@ class Environment:
 #       - 4 one hot signals for the current direction
 #       - 4 signals saying if the adjacent square in the given direction is occupied or is the edge of the map
 
-n_observations = 10
+n_observations = 3
 n_actions = 4
 
 class DQN(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        """
-        self.conv1 = torch.nn.Conv2d(n_observations, 16, 3, padding=1)
-        self.conv2 = torch.nn.Conv2d(16, 32, 3, padding=1) 
-        """
-        self.linear1 = torch.nn.Linear(n_observations, 128)
+
+        self.conv1 = torch.nn.Conv2d(n_observations, 64, 5, padding='same')
+        self.conv2 = torch.nn.Conv2d(64, 64, 5, padding='same') 
+        
+        self.linear1 = torch.nn.Linear(260, 128)
         self.linear2 = torch.nn.Linear(128, 128)
         self.linear3 = torch.nn.Linear(128, n_actions)
         
@@ -128,16 +117,18 @@ class DQN(torch.nn.Module):
         self.relu = torch.nn.ReLU()
     
     def forward(self, x):
-        """
-        x = self.conv1(x)
+        x_map, x_direction = x
+        
+        x = self.conv1(x_map)
         x = self.relu(x)
         x = self.maxpool(x)
         x = self.conv2(x)
         x = self.relu(x)
         x = self.maxpool(x)
         
-        x = x.view(-1, ((width//snake_size)//4)*((height//snake_size)//4)*32)
-        """
+        x = x.view(-1, 256)
+        x = torch.cat([x, x_direction], dim=1)
+
         x = self.linear1(x)
         x = self.relu(x)
         x = self.linear2(x)
@@ -197,18 +188,16 @@ BATCH_SIZE = 256
 GAMMA = 0.99
 EPS_START = 0.9
 EPS_END = 0.05
-EPS_DECAY = 50000
+EPS_DECAY = 10000
 TAU = 0.005
 LR = 1e-4
-
-
 
 
 if __name__ == "__main__":
     window_size = width, height = 200, 200
     
-    num_episode = 50000
-    warmup_episode = 7000
+    num_episode = 10000
+    warmup_episode = 700
 
     memory = ReplayMemory(100000)
     step = 0
@@ -219,13 +208,6 @@ if __name__ == "__main__":
     target_net.load_state_dict(policy_net.state_dict())
 
     optimizer = torch.optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
-    """
-    step between episodes instead
-    scheduler_warmup = LinearLR(optimizer, start_factor=0.33, end_factor=1.0, total_iters=warmup_episode)
-    scheduler_cosine = CosineAnnealingLR(optimizer, T_max=num_episode - warmup_episode, eta_min=1e-5)
-    scheduler = SequentialLR(optimizer, schedulers=[scheduler_warmup, scheduler_cosine], milestones=[warmup_episode])
-    """
-    
     
     ######################
     #   TRAINING LOOP    #
@@ -249,14 +231,15 @@ if __name__ == "__main__":
 
             step += 1
         
-        # scheduler.step()
         length_history.append(length)
         
         if i%10 == 0:
             print("="*50, flush=True)
             print(f"Episode {i+1}", flush=True)
             print(f"Eps = {EPS_END + (EPS_START - EPS_END) * np.exp(-1. * step / EPS_DECAY)}", flush=True)
-            # print(f"Learning rate = {scheduler.get_last_lr()}", flush=True)
             print(f"Average score on recent episodes : {mean(length_history[-100:])}", flush=True)
-            
-    torch.save(policy_net.state_dict(), "models/model2.pth")
+    checkpoint = { 
+        'policy': policy_net.state_dict(),
+        'target': target_net.state_dict(),
+        'optimizer': optimizer.state_dict()}
+    torch.save(checkpoint, 'models/checkpoint1.pth')
