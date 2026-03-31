@@ -8,8 +8,7 @@ from collections import deque
 
 snake_size = 20
 
-#device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-device = "cpu"
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device, flush=True)
 
 
@@ -186,11 +185,11 @@ def soft_update():
 
 BATCH_SIZE = 256
 GAMMA = 0.99
-EPS_START = 0.9
+EPS_START = 0.2
 EPS_END = 0.05
-EPS_DECAY = 10000
+EPS_DECAY = 100000
 TAU = 0.005
-LR = 1e-4
+LR = 4e-5
 
 
 if __name__ == "__main__":
@@ -203,11 +202,16 @@ if __name__ == "__main__":
     step = 0
     env = Environment(width, height)
 
+    checkpoint = torch.load("models/checkpoint1.pth")
     policy_net = DQN().to(device)
     target_net = DQN().to(device)
-    target_net.load_state_dict(policy_net.state_dict())
+    
+    # target_net.load_state_dict(policy_net.state_dict())
+    policy_net.load_state_dict(checkpoint['policy'])
+    target_net.load_state_dict(checkpoint['target'])
 
     optimizer = torch.optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
+    optimizer.load_state_dict(checkpoint['optimizer'])
     
     ######################
     #   TRAINING LOOP    #
@@ -242,4 +246,4 @@ if __name__ == "__main__":
         'policy': policy_net.state_dict(),
         'target': target_net.state_dict(),
         'optimizer': optimizer.state_dict()}
-    torch.save(checkpoint, 'models/checkpoint1.pth')
+    torch.save(checkpoint, 'models/checkpoint2.pth')
