@@ -4,9 +4,6 @@ from random import choice
 class Apple:
     def __init__(self, size, width, height):
         self.allowed_pos = set([(x, y) for x in range(0, width, size) for y in range(0, height, size)])
-        self.allowed_pos.remove(((width//2)//size*size, (height//2)//size*size))
-        
-        self.position = choice(list(self.allowed_pos))
         
     def move(self):
         self.position = choice(list(self.allowed_pos))
@@ -15,12 +12,21 @@ class Snake:
     def __init__(self, size, width, height):
         self.size = size
         
-        self.positions = [((width//2)//size*size, (height//2)//size*size)]
-        
+        self.positions = []
+        for i in range(9):
+            self.positions.append((size*(9-i), (height//2)//size*size - 3*size))
+        for i in range(1, 3):
+            self.positions.append((size, (height//2)//size*size - (3-i)*size))
+        for i in range(7):
+            self.positions.append((size*(1+i), (height//2)//size*size))
+
         self.speedx = 1
         self.speedy = 0
         
         self.apple = Apple(size, width, height)
+        for pos in self.positions:
+            self.apple.allowed_pos.remove(pos)
+        self.apple.move()
         
         self.width = width
         self.height = height

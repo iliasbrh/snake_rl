@@ -185,11 +185,11 @@ def soft_update():
 
 BATCH_SIZE = 256
 GAMMA = 0.99
-EPS_START = 0.2
-EPS_END = 0.05
+EPS_START = 0.15
+EPS_END = 0.02
 EPS_DECAY = 100000
 TAU = 0.005
-LR = 4e-5
+LR = 1e-5
 
 
 if __name__ == "__main__":
@@ -202,7 +202,7 @@ if __name__ == "__main__":
     step = 0
     env = Environment(width, height)
 
-    checkpoint = torch.load("models/checkpoint1.pth")
+    checkpoint = torch.load("models/checkpoint3.pth")
     policy_net = DQN().to(device)
     target_net = DQN().to(device)
     
@@ -246,4 +246,4 @@ if __name__ == "__main__":
         'policy': policy_net.state_dict(),
         'target': target_net.state_dict(),
         'optimizer': optimizer.state_dict()}
-    torch.save(checkpoint, 'models/checkpoint2.pth')
+    torch.save(checkpoint, 'models/checkpoint4.pth')
